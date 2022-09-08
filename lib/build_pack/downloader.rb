@@ -4,14 +4,11 @@ module BuildPack
   class Downloader
     MYSQL_BASE_URL = "http://security.ubuntu.com/ubuntu/pool/main/m/mysql-5.7/"
 
-    # example client: "mysql-client-core-5.7_5.7.22-0ubuntu0.16.04.1_amd64.deb"
-    REGEX = /.*(mysql-client-core-5\.7_5\.7\.\d\d-0ubuntu0\.18\.\d\d\.\d_amd64.deb).*/
-
     class << self
-      def download_latest_client_to(path)
+      def download_latest_client_to(package_regex, path)
         Logger.log_header("Downloading MySQL Client package")
 
-        client = most_recent_client
+        client = most_recent_client(package_regex)
 
         if client.empty?
           Logger.log("No suitable clients available")
@@ -23,7 +20,7 @@ module BuildPack
         File.open(path, 'w+').write(Net::HTTP.get(URI.parse("#{MYSQL_BASE_URL}#{client}")))
       end
 
-      def most_recent_client
+      def most_recent_client(package_regex)
         Logger.log("Looking for clients at: #{MYSQL_BASE_URL}")
 
         response = Net::HTTP.get(URI.parse("#{MYSQL_BASE_URL}"))
@@ -31,7 +28,7 @@ module BuildPack
         Logger.log("available clients:")
         most_recent = ""
         response.lines.each do |line|
-          if REGEX =~ line
+          if package_regex =~ line
             Logger.log("#{$1}")
             most_recent = $1 if $1 > most_recent
           end
