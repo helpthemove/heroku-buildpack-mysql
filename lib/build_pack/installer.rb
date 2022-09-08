@@ -4,10 +4,12 @@ module BuildPack
   class Installer
     class << self
 
-      def install(build_dir, cache_dir)
+      def install(build_dir:, cache_dir:, package:, package_regex:, binaries:)
+        @package = package
+        @binaries = binaries
         init_paths(build_dir, cache_dir)
         make_dirs
-        Downloader.download_latest_client_to(@mysql_pkg) unless cached?
+        Downloader.download_latest_client_to(package_regex, @mysql_pkg) unless cached?
         if client_exists?
           install_client and cleanup
         else
@@ -20,9 +22,9 @@ module BuildPack
       def init_paths(build_dir, cache_dir)
         @bin_path = "#{build_dir}/bin"
         @tmp_path = "#{build_dir}/tmp"
-        @mysql_path = "#{@tmp_path}/mysql-client-core"
+        @mysql_path = "#{@tmp_path}/#{@package}"
         @mysql_binaries = "#{@mysql_path}/usr/bin"
-        @mysql_pkg = "#{cache_dir}/mysql-client-core.deb"
+        @mysql_pkg = "#{cache_dir}/#{@package}.deb"
       end
 
       def make_dirs
@@ -55,15 +57,14 @@ module BuildPack
       end
 
       def fix_perms_and_mv_binaries
-        # TODO: Doing a glob for some reason causes issues on heroku-16,
-        #       erroring out as it can't find the files to chmod and mv.
-        #       Specifying `mysqldump` specifically for now. Otherwise use:
-        # ```
-        # binaries = Dir.glob("#{@mysql_binaries}/*")
-        # ```
-        mysqldump_binary = Dir.glob("#{@mysql_binaries}/mysql")
-        FileUtils.chmod("u=wrx", mysqldump_binary)
-        FileUtils.mv(mysqldump_binary, @bin_path)
+        Logger.log('Contents of mysql bin dir:')
+        Logger.log(`ls #{@mysql_binaries}`)
+
+        @binaries.each do |binary|
+          path = Dir.glob("#{@mysql_binaries}/#{binary}")
+          FileUtils.chmod("u=wrx", path)
+          FileUtils.mv(path, @bin_path)
+        end
       end
 
       def cleanup
